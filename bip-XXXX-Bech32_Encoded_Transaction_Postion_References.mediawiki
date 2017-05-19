@@ -1,0 +1,267 @@
+<pre>
+  BIP: XXXX
+  Layer: Applications
+  Title: Bech32 Encoded Transaction Postion References
+  Author: Велеслав <veleslav.bips@protonmail.com>, Jonas Schnelli <dev@jonasschnelli.ch>
+  Comments-Summary: No comments yet.
+  Comments-URI: https://github.com/bitcoin/bips/wiki/Comments:BIP-XXXX
+  Status: Draft
+  Type: Informational
+  Created: 
+  License: BSD-2-Clause
+</pre>
+
+== Introduction ==
+
+=== Abstract ===
+
+This document proposes a Bech32 encoded transaction position reference, "TxRef", and a standard for referencing positions of confirmed transactions using it.
+
+''Please note: that a TxRef dose not reference a actual transaction itself, rather it references a possible location within a blockchain for a transaction, that may or may not, point to an actual transaction and may change with reorganisations.''
+
+=== Copyright ===
+
+This BIP is licensed under the 2-clause BSD license.
+
+=== Motivation ===
+
+Bitcoin uses regularly use TxID (Transaction Identifiers) for referencing individual transactions. TxID's are a core part of the consensus protocol and were naturally exported to the user-space with the first release of Bitcoin.
+
+However, for many use-cases they have practical limitations:
+* TxID's are expensive for full nodes to lookup.
+* TxID's require third-party service for SPV wallets to lookup.
+* TxID's are very long HEX encoded values (64 characters long).
+* TxID's are without checksums.
+For transactions that have been embedded in the blockchain, it is possible to reference them not by their ID, but by their location within the blockchain itself. In this document we propose a new way pointing to confirmed transaction via referencing their locations within the blockchain.
+
+=== Examples ===
+All examples use the ''Bitcoin Display Format 0'' described in ''Bitcoin Display Formats'' appendix.
+* Genesis Coinbase Transaction: <tt>tx1-rqqq-qqqq-qmhu-qk</tt>
+* Transaction #2205 of Block #466793: <tt>tx1-rjk0-u5ng-4jsf-mc</tt>
+
+== Specification ==
+
+A '''confirmed transaction position reference''', or '''TxRef''' is reference to a particular location within the blockchain specified by the block height and the transaction position.
+
+''Please Note: All values in this specification are encoded in little-endian format.''
+
+A TxRef may reference a location that doesn't exist because:
+* The block height hasn't been minded yet.
+* The Transaction Position is more than the total transaction within the referenced block.
+Therefore, implementers must be careful not to display TxRef's to users prematurely:
+* Applications MUST NOT display TxRef's for transactions with less than 6 confirmations.
+* Application MUST show a warning for TxRef's for transactions with less than 100 confirmations.
+** This warning SHOULD state that in the case of a large reorganization, the TxRefs Displayed may point to a different transaction, or to no transaction at all.
+
+=== Human Display Formats ===
+This specification provides standardisation of encoding and namespacing for '''application display formats'''.
+
+If a display format doesn't comply with this standard, it MUST be called a '''non-standard application display format'''.
+
+==== Encoding ====
+* All display formats MUST be encoded with standard Bech32<ref>'''Why use Bech32 Encoding for Confirmed Transaction References?''' The error detection and correction properties of this encoding format make it very attractive. We expect that it will be reasonable for software to correct a maximum of two characters; however, we haven’t specified this yet.</ref> encoding as defined within the [https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki BIP 0173] specification.
+* The Human Readable Part of the Bech32 encoding MUST be "tx"<ref>'''Why use the same Human Readable Part for different systems or blockchains?''' The ‘tx1’ prefix is to namespace the Bech32 encoding to this specification. We use Magic Values internally to namespace between projects.</ref>.
+* All Non Bech32 alphabet characters after the Bech32 code separator MUST be ignored when phasing, (except for terminating characters).<ref>'''Why Strip all Non-Bech32 Alphabet Characters?''' We do not wish to expect the users to keep their TxRef's in good unicode form. We expect them to copy, paste, write by-hand, write in a mix of character sets, etc.  Phasers should automaticity correct for all of these sorts of errors. However we only specify the removal of non-bech32-alphabet characters.
+</ref>
+
+==== Namespacing ====
+* Every non-compatible system MUST use a different '''magic code'''.
+* The magic code MUST be prefixed to the data payload, and included in the Bech32 encoding.
+* Applications MUST reject codes with unknown magic codes.
+* Applications MUST display an error for known, but unsupported magic codes.
+
+=== Magic Codes ===
+* Magic codes are either 5, 10, 15, or 20 bit long.
+
+* The length of the magic code is set by the first 5 bits:
+** 0x0 to 0x7: 5 bit long. (All Reserved<ref>'''Why reserve all single character Magic Codes?''' The authors of this specification see many potential Bitcoin Related uses for additional magic codes, such as with Sidechains and other Special User Facing Projects.</ref> for Bitcoin-Related Use)
+** 0x8 to 0x15: 10 bit long.
+** 0x16 to 0x23: 15 bit long.
+** 0x24 to 0x31: 20 bit long.
+
+=== Compatibly ===
+There are no known compatibility issues.
+
+== Rationale ==
+
+<references />
+
+== Reference implementations ==
+C Reference Implementation: https://github.com/jonasschnelli/bitcoin_txref_code
+
+== Appendices ==
+
+=== Test Vectors ===
+This appendix contains test vectors for TxRef Standard Application Display Formats.
+
+''Please Note: All test vectors are shown to help test if a Standard Display Client is compliant or not. All real-life applications should comply with the Display Format's own Test Vectors''
+
+The following strings have a valid Human Readable Part and Bech32 Checksum.
+* <tt>TX1A12UEL5L</tt>
+* <tt>tx1an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1tt5tgs</tt>
+* <tt>tx1abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw</tt>
+* <tt>tx11qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqc8247j</tt>
+
+The following list gives invalid TxRef's and the reason for their invalidity.
+* <tt>bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kg3g4ty</tt>: Invalid human-readable part
+* <tt>tx1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5</tt>: Invalid checksum
+
+=== Allocated Magic Values ===
+
+This appendix contains a table of the allocated or reserved magic codes.
+* If you wish to claim a magic code, please open a pull request adding the code to this list.
+* If this list becomes too popular, we will move it to another location.
+
+==== Reserved Values: ====
+{| class="wikitable"
+|'''Magic Value'''
+|'''Starting Value(s)'''
+|'''Display'''
+|'''Description'''
+|-
+|Reserved
+|0x0
+|‘q’
+|For future use by Bitcoin. (5 bits).
+|-
+|Reserved
+|0x1
+|‘p’
+|For future use by Bitcoin. (5 bits).
+|-
+|Reserved
+|0x2
+|‘z’
+|For future use by Bitcoin. (5 bits).
+|-
+|'''Bitcoin'''
+|'''0x3'''
+|'''‘r’'''
+|'''Use on Bitcoin  Main Network (5 bits).'''
+|-
+|Reserved
+|0x4
+|‘y’
+|For future use by Bitcoin. (5 bits).
+|-
+|Reserved
+|0x5
+|‘9’
+|For future use by Bitcoin. (5 bits).
+|-
+|'''Testnet'''
+|'''0x6'''
+|'''‘x’'''
+|'''Use on Any Test  Network (5 bits).'''
+|-
+|Reserved
+|0x7
+|‘8’
+|For future use by Bitcoin. (5 bits).
+|}
+
+=== Bitcoin Display Formats ===
+This appendix contains the specifications for Bitcoin Related Application Display Formats.
+* If you wish to contribute a new display-format, please open a pull request adding to this appendix.
+** For Example. A display format for a Bitcoin Sidechain.
+* We have deliberately not included a Bitcoin display format for the years past 2048.
+** We think it is prudent to design the new display format closer to this date.
+
+==== Bitcoin Display Format 0 ====
+This application display format is defined for all Bitcoin main-network transactions that have:
+* Block Height
+** Between 0, and 0x1FFFFF.
+* Transaction Position
+** Between 0, and 0x1FFF.
+
+This application display format produces a 14-character data part starting with the character ‘r’.
+* Separators MUST be added as shown: tx1-rXXX-XXXX-XXXX-XX.
+{| class="wikitable"
+|'''Format ‘0’'''
+|'''Bit'''
+|'''Bit(s)'''
+|'''14 Character Encoding = 40bit + 30bit checksum'''
+|-
+|Magic
+|0 – 4
+|5
+|0x3
+|-
+|Version
+|5
+|1
+|Must be set to 0x0
+|-
+|Block Height
+|6 – 26
+|21
+|From the Genesis Block to about Year 2048
+|-
+|Tx Position
+|27 – 39
+|13
+|8191 transactions. (A full Bitcoin Block without Hard  Fork).
+|}
+
+===== Test Vectors (for Display Format 0) =====
+The following list gives properly encoded Display Format 0 TxRef's and the values in hex. (Block Height, Tx Position)
+* <tt>tx1-rqqq-qqqq-qmhu-qk</tt>: <tt>(0x0, 0x0)</tt>
+* <tt>xxxxxx</tt>: <tt>(0x0, 0x1FFF)</tt>
+* <tt>xxxxxx</tt>: <tt>(0x1FFFFF, 0x0)</tt>
+* <tt>tx1-r7ll-llll-khym-tq</tt>: <tt>(0x1FFFFF, 0x1FFF)</tt>
+
+The following list give valid Display Format 0 TxRef's and the values in hex. (Block Height, Tx Position)
+* <tt>tx1-rjk0-u5ng-4jsf-mc</tt>: <tt>(0x71F69, 0x89D)</tt>
+* <tt>TX1RJK0U5NG4JSFMC</tt>:  <tt>(0x71F69, 0x89D)</tt>
+* <tt>TX1R1JK0--U5bNG4JSb----FMC</tt>:  <tt>(0x71F69, 0x89D)</tt>
+* <tt>tx1 rjk0 u5ng 4jsfmc</tt>: <tt>(0x71F69, 0x89D)</tt>
+* <tt>tx1!rjk0\u5ng*4jsf^^mc</tt>: <tt>(0x71F69, 0x89D)</tt>
+
+The following list gives invalid Display Format 0 TxRef's and the reason for their invalidity.
+* <tt>xxxxxx</tt>: Magic Value not 0x3
+* <tt>xxxxxx</tt>: Version not 0x0.
+* <tt>tx1-rjk0-u5ng-gghq-fkg7</tt>: Valid Bech32, but 10x5bit packages instead of 8.
+* <tt>tx1-rjk0-u5qd-s43z</tt>: Valid Bech32, but 6x5bit packages instead of 8.
+
+=== Special Display Formats ===
+This appendix contains the specifications for Special Display formats that should not be used in production use.
+
+==== Testnet Display Format A ====
+This ''non-standard'' application display format is defined for all test-network transactions that have:
+* Block Height
+** Between 0, and 0x3FFFFFF.
+* Transaction Position
+** Between 0, and 0x3FFFF
+This ''non-standard'' application display format uses the non-standard "testtx" as the human readable part of the Bech32 encoding.
+
+This application display format produces a 16-character data part starting with the character ‘x’.
+* Separators MUST be added as shown: testtx1-xXXX-XXXX-XXXX-XXXX.
+{| class="wikitable"
+|'''Format ‘A’'''
+|'''Bit'''
+|'''Bit(s)'''
+|'''16 Character Encoding = 50bit + 30bit checksum'''
+|-
+|Magic
+|0 – 4
+|5
+|0x6
+|-
+|Version
+|5
+|1
+|Must be set to 0x0
+|-
+|Block Height
+|6 – 31
+|26
+| 
+|-
+|Tx Position
+|32 – 44
+|18
+| 
+|}
+
+== Acknowledgements ==
+Special Thanks to Pieter Wuille and Greg Maxwell for Bech32, an wonderful user-facing data encoding.
