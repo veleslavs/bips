@@ -15,9 +15,9 @@
 
 === Abstract ===
 
-This document proposes a Bech32 encoded transaction position reference, "TxRef", and a standard for referencing positions of confirmed transactions using it.
+This document proposes a Bech32 encoded transaction position reference, "TxRef", and a standard for referencing the positions of confirmed transactions using it.
 
-''Please note: that a TxRef dose not reference a actual transaction itself, rather it references a possible location within a blockchain for a transaction, that may or may not, point to an actual transaction and may change with reorganisations.''
+''Please note: that a TxRef does not reference an actual transaction itself, rather it references a possible location within a blockchain for a transaction, that may or may not, point to an actual transaction and may change with reorganisations.''
 
 === Copyright ===
 
@@ -25,14 +25,14 @@ This BIP is licensed under the 2-clause BSD license.
 
 === Motivation ===
 
-Bitcoin uses regularly use TxID (Transaction Identifiers) for referencing individual transactions. TxID's are a core part of the consensus protocol and were naturally exported to the user-space with the first release of Bitcoin.
+Bitcoin uses regularly use TxID (Transaction Identifiers) for referencing individual transactions. TxID's are a core part of the consensus protocol and were naturally exported to the user-space since the first release of Bitcoin.
 
 However, for many use-cases they have practical limitations:
 * TxID's are expensive for full nodes to lookup.
 * TxID's require third-party service for SPV wallets to lookup.
 * TxID's are very long HEX encoded values (64 characters long).
 * TxID's are without checksums.
-For transactions that have been embedded in the blockchain, it is possible to reference them not by their ID, but by their location within the blockchain itself. In this document we propose a new way pointing to confirmed transaction via referencing their locations within the blockchain.
+For transactions that have been embedded in the blockchain, it is possible to reference them not by their ID, but by their location within the blockchain itself. In this document, we propose a standard for doing this.
 
 === Examples ===
 All examples use the ''Bitcoin Display Format 0'' described in ''Bitcoin Display Formats'' appendix.
@@ -61,7 +61,7 @@ If a display format doesn't comply with this standard, it MUST be called a '''no
 ==== Encoding ====
 * All display formats MUST be encoded with standard Bech32<ref>'''Why use Bech32 Encoding for Confirmed Transaction References?''' The error detection and correction properties of this encoding format make it very attractive. We expect that it will be reasonable for software to correct a maximum of two characters; however, we haven’t specified this yet.</ref> encoding as defined within the [https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki BIP 0173] specification.
 * The Human Readable Part of the Bech32 encoding MUST be "tx"<ref>'''Why use the same Human Readable Part for different systems or blockchains?''' The ‘tx1’ prefix is to namespace the Bech32 encoding to this specification. We use Magic Values internally to namespace between projects.</ref>.
-* All Non Bech32 alphabet characters after the Bech32 code separator MUST be ignored when phasing, (except for terminating characters).<ref>'''Why Strip all Non-Bech32 Alphabet Characters?''' We do not wish to expect the users to keep their TxRef's in good unicode form. We expect them to copy, paste, write by-hand, write in a mix of character sets, etc.  Phasers should automaticity correct for all of these sorts of errors. However we only specify the removal of non-bech32-alphabet characters.
+* All Non Bech32 alphabet characters after the Bech32 code separator MUST be ignored when phasing, (except for terminating characters).<ref>'''Why Strip all Non-Bech32 Alphabet Characters?''' We do not wish to expect the users to keep their TxRef's in good unicode form. We expect them to copy, paste, write by-hand, write in a mix of character sets, etc.  Phasers should automaticity correct for all of these sorts of errors. However, we only specify the removal of non-bech32-alphabet characters.
 </ref>
 
 ==== Namespacing ====
@@ -71,13 +71,13 @@ If a display format doesn't comply with this standard, it MUST be called a '''no
 * Applications MUST display an error for known, but unsupported magic codes.
 
 === Magic Codes ===
-* Magic codes are either 5, 10, 15, or 20 bit long.
+* Magic codes are either 5, 10, 15, or 20-bits long.
 
 * The length of the magic code is set by the first 5 bits:
-** 0x0 to 0x7: 5 bit long. (All Reserved<ref>'''Why reserve all single character Magic Codes?''' The authors of this specification see many potential Bitcoin Related uses for additional magic codes, such as with Sidechains and other Special User Facing Projects.</ref> for Bitcoin-Related Use)
-** 0x8 to 0x15: 10 bit long.
-** 0x16 to 0x23: 15 bit long.
-** 0x24 to 0x31: 20 bit long.
+** 0x0 to 0x7: 5-bit long. (All Reserved<ref>'''Why reserve all single character Magic Codes?''' The authors of this specification see many potential Bitcoin Related uses for additional magic codes, such as with Sidechains and other Special User Facing Projects.</ref> for Bitcoin-Related Use)
+** 0x8 to 0x15: 10-bit long.
+** 0x16 to 0x23: 15-bit long.
+** 0x24 to 0x31: 20-bit long.
 
 === Compatibly ===
 There are no known compatibility issues.
@@ -113,52 +113,58 @@ This appendix contains a table of the allocated or reserved magic codes.
 * If this list becomes too popular, we will move it to another location.
 
 ==== Reserved Values: ====
+Magic Values 5-bit long:
 {| class="wikitable"
 |'''Magic Value'''
 |'''Starting Value(s)'''
 |'''Display'''
 |'''Description'''
 |-
-|Reserved
+|
 |0x0
 |‘q’
-|For future use by Bitcoin. (5 bits).
-|-
 |Reserved
+|-
+|
 |0x1
 |‘p’
-|For future use by Bitcoin. (5 bits).
-|-
 |Reserved
+|-
+|
 |0x2
 |‘z’
-|For future use by Bitcoin. (5 bits).
+|Reserved
 |-
 |'''Bitcoin'''
 |'''0x3'''
 |'''‘r’'''
-|'''Use on Bitcoin  Main Network (5 bits).'''
+|'''Bitcoin Main Chain'''
 |-
-|Reserved
+|
 |0x4
 |‘y’
-|For future use by Bitcoin. (5 bits).
-|-
 |Reserved
+|-
+|
 |0x5
 |‘9’
-|For future use by Bitcoin. (5 bits).
+|Reserved
 |-
 |'''Testnet'''
 |'''0x6'''
 |'''‘x’'''
-|'''Use on Any Test  Network (5 bits).'''
+|'''Any Test Network'''
 |-
-|Reserved
+|
 |0x7
 |‘8’
-|For future use by Bitcoin. (5 bits).
+|Reserved
 |}
+Magic Values 10-bit long: (none allocated).
+
+Magic Values 15-bit long: (none allocated).
+
+Magic Values 20-bit long: (none allocated);
 
 === Bitcoin Display Formats ===
 This appendix contains the specifications for Bitcoin Related Application Display Formats.
@@ -264,4 +270,4 @@ This application display format produces a 16-character data part starting with 
 |}
 
 == Acknowledgements ==
-Special Thanks to Pieter Wuille and Greg Maxwell for Bech32, an wonderful user-facing data encoding.
+Special Thanks to Pieter Wuille and Greg Maxwell for Bech32, a wonderful user-facing data encoding.
