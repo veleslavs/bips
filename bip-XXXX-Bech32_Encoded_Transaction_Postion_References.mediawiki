@@ -212,8 +212,8 @@ This application display format produces a 14-character data part starting with 
 ===== Test Vectors (for Display Format 0) =====
 The following list gives properly encoded Display Format 0 TxRef's and the values in hex. (Block Height, Tx Position)
 * <tt>tx1-rqqq-qqqq-qmhu-qk</tt>: <tt>(0x0, 0x0)</tt>
-* <tt>xxxxxx</tt>: <tt>(0x0, 0x1FFF)</tt>
-* <tt>xxxxxx</tt>: <tt>(0x1FFFFF, 0x0)</tt>
+* <tt>tx1-rqqq-qull-6v87-r7</tt>: <tt>(0x0, 0x1FFF)</tt>
+* <tt>tx1-r7ll-lrqq-vq5e-gg</tt>: <tt>(0x1FFFFF, 0x0)</tt>
 * <tt>tx1-r7ll-llll-khym-tq</tt>: <tt>(0x1FFFFF, 0x1FFF)</tt>
 
 The following list give valid Display Format 0 TxRef's and the values in hex. (Block Height, Tx Position)
@@ -224,8 +224,8 @@ The following list give valid Display Format 0 TxRef's and the values in hex. (B
 * <tt>tx1!rjk0\u5ng*4jsf^^mc</tt>: <tt>(0x71F69, 0x89D)</tt>
 
 The following list gives invalid Display Format 0 TxRef's and the reason for their invalidity.
-* <tt>xxxxxx</tt>: Magic Value not 0x3
-* <tt>xxxxxx</tt>: Version not 0x0.
+* <tt>tx1-t7ll-llll-gey7-ez</tt>: Magic 0xB instead of 0x3.  <tt>(0x1FFFFF, 0x1FFF)</tt>
+* <tt>tx1-rlll-llll-cgqu-n2</tt>: Version 1 instead of 0. <tt>(0x1FFFFF, 0x1FFF)</tt>
 * <tt>tx1-rjk0-u5ng-gghq-fkg7</tt>: Valid Bech32, but 10x5bit packages instead of 8.
 * <tt>tx1-rjk0-u5qd-s43z</tt>: Valid Bech32, but 6x5bit packages instead of 8.
 
