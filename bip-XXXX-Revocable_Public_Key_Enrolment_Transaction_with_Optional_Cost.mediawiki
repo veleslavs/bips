@@ -2,7 +2,7 @@
   BIP: XXXX
   Layer: Applications
   Title: Revocable Public Key Enrolment Transaction with Optional Cost
-  Author: Велеслав <veleslav.bips@protonmail.com>
+  Author: Велеслав <veleslav.bips@protonmail.com>, Jonas Schnelli <dev@jonasschnelli.ch>
   Comments-Summary: No comments yet.
   Comments-URI: https://github.com/bitcoin/bips/wiki/Comments:BIP-XXXX
   Status: Draft
@@ -15,38 +15,42 @@
 
 === Abstract ===
 
-This document proposes a new transaction template for linking a single revocable proof-of-burn output with a public key.
+This document proposes a standard transaction template for blockchain to insert revocable public keys, with an optional burn amount.
 
 === Copyright ===
 
 This BIP is licensed under the 2-clause BSD license.
 
 === Motivation ===
+Decentralised systems have been struggling with the ongoing problem of enrolment of public key: the process of accepting new keys into a system. The core difficulty of public key enrolment is that new public keys may be used maliciously and attack the network (before they are banned or otherwise ejected). If the enrolment process isn't costly, a huge number of malicious public keys may be cheaply enrolled and used attack the network.
 
-Protecting against denial-of-service in decentralized systems is a hard problem. One approach is to require expensive operations to be accompanied with a proportional proof-of-burn.
+Various approaches have been attempted to make the enrolment process costly, however they have all proven to be either ineffective, centralising, or both.
 
-Bitcoin has a built-in proof-of-burn mechanism with the [https://en.bitcoin.it/wiki/OP_RETURN OP_RETURN] op-code. However, this op-code doesn’t provide a good API for higher level applications that wish to make use of proof-of-burn.
+In this proposal we cover the core required utilities of public key enrolment in a decentralised system:
 
-We propose an elegant and convenient transaction template that can be used by other application and systems that desire proof-of-burn functionality.
+==== Unambiguous Public Key: ====
+* Decentralised systems need an unambiguous way to refer to a public key.
+
+==== Cost: ====
+* Decentralised systems need to be able to autonomously calculate the value burnt in the process of enrolling a public key.
+
+==== Revocation: ====
+* Decentralised systems need a standard way for private-key-holders to revoke an enrolled public key.
+
+==== Small Size: ====
+* Decentralised systems need to protect against denial of service, so the total-size of an public key enrolment transaction is limited.
 
 === Examples ===
-
 TBD
 
 == Specification ==
 
-We first describe the transaction template and validation. We then go on to describe the revocation process. <ref>'''Why include mandatory support for revocation?'''
-
-It is good practice for any system that involves enrolment to also support revocation. The authors wish instil this good practice as a core part of this specification.
-</ref> Finally, we describe convention for deriving the revocation and public key from a single private key. <ref>'''Why derive the revocation code from the same private key?'''
-
-The holder of the private key enrolled should always be able to revoke the enrolment transaction. However, the holder of the private key should be able to hand the revocation code to a third party without disclosing the private key.
-</ref>
-
 All hashes used in this specification defined by the bitcoin’s [https://en.bitcoin.it/wiki/Script OP_HASH256] op-code.
 
-=== Enrolment Transaction Template ===
-An enrolment transaction has the characteristic form of:
+We first describe the public key enrolment transaction template.
+
+=== Overview ===
+An public key enrolment transaction is new transaction template of the following general form:
 {| class="wikitable"
 !Inputs
 !Output Script
@@ -56,48 +60,37 @@ An enrolment transaction has the characteristic form of:
 |OP_RETURN '''PAYLOAD'''
 |'''BURN_VALUE'''
 |-
-|OP_HASH256 '''REVOKE_PUZZLE'''<ref>'''Why have a special revocation puzzle, instead of spending a normal output?'''
-
-The primary reason is that it is the correct way of approaching the problem of revocation. There is no need for a cryptographic signature as it is a single-time operation.
-Additionally, we want the revocation checking code to be very simple; using OP_HASH256 means we only depends on SHA256.
-Finally, is to make the revocation codes small. 32 bytes is probably unnecessary even-so.
+|OP_HASH256 '''REVOKE_PUZZLE'''<ref>'''Why have a special revocation puzzle, instead of spending a normal output?'''  The primary reason is that it is the correct way of approaching the problem of revocation. There is no need for a cryptographic signature as it is a single-time operation. Additionally, we want the revocation checking code to be very simple; using OP_HASH256 means we only depends on SHA256.
 </ref> OP_EQUAL
-|ZERO<ref>'''Why must the revocation output have zero value?'''
-
-The revocation output should not be used to store value as it can be claimed by a miner upon revocation.
-Additionally, we have no way of predicting the fee-requirements for the future. So allowing a non-zero value will encourage such speculation.
+|ZERO<ref>'''Why must the revocation output have zero value?'''  The revocation output should not be used to store value as it can be claimed by a miner upon revocation. Additionally, we have no way of predicting the fee-requirements for the future. So allowing a non-zero value will encourage such speculation.
 </ref>
 |-
 |(optional) Change Output
 |(ignored)
 |}
-An enrolment transaction always has two exact forms<ref>'''Why restrict the number of inputs and outputs?'''
 
-The size of the enrolment transaction needs to be constrained to protect against a miner or user making almost 1mb registration transactions.
-</ref>:
+=== Template Rules ===
+The following rules SHOULD be enforced in the is_standard rules and end-user applications:
 
-* 1 Input – 2 Output
-* 1 Input – 3 Output.
+===== Structure: =====
+* The transaction total serialized size MUST be equal or less than 270-bytes.
 
-==== Payload ====
-The payload consists of two parts.
-# (constant 64 bytes) Secp256k1 '''compact signature''' as defined in [https://github.com/bitcoin-core/secp256k1/blob/master/include/secp256k1.h secp256k1.h]
-# (optional 0 to 40 bytes) Application Use Payload
-The maximum valid size of the payload is 104 bytes.
+* The transaction MUST contain only one input.
+* The transaction MAY contain a third output.
 
-==== Signature<ref>'''Why include a signature of the revocation hash, instead of just the public key?'''
+===== First Output: =====
+* Script MUST of the format: ''op_return '''payload'''''
+** The ''payload'' MUST be less than 104-bytes in length.
+** The first 64-bytes of the of the payload MUST be a valid compact signature (as defined in [https://github.com/bitcoin-core/secp256k1/blob/master/include/secp256k1.h secp256k1.h]) in of the '''signing data'''.
+* Output value MAY have a zero output value.
 
-The enrolment transaction format should protect against enrolments of public keys where the owner of the public key is without opportunity for revocation.
-The simplest way to provide this protection is to require the owner of the public key to sign the revocation puzzle.
-</ref> ====
-The signature provides two important roles:
-# Defining the '''Public Key''' (via [https://github.com/bitcoin-core/secp256k1/blob/master/include/secp256k1_recovery.h public key recovery]).
-# Proof that the owner of the public key accepts the associated revocation puzzle.
-The '''Signing Data'''<ref>'''Why isn't the input covered by the signature?'''
+===== Second Output: =====
+* Output script MUST be of the format: ''op_hash256 '''revoke_puzzle''' op_equal''.
+** The ''revoke puzzle'' MUST be exactly 32-bytes long.
+* Output value MUST be zero.
 
-Applications MUST assume that a public key may have multiple enrolments. Covering the input within the signature doesn't protect against duplicate enrolments or any other real benefits.
-At best, it would add unnecessary complexity; at worst, it would provide a false sense of security.
-</ref> is the hash of the prefixed revocation puzzle. (totalling 39 byte).
+===== Signing Data: =====
+* The signing data MUST be the double sha256 hash of the following 39-bytes of data:
 {| class="wikitable"
 !Byte
 !Bytes
@@ -105,26 +98,39 @@ At best, it would add unnecessary complexity; at worst, it would provide a false
 |-
 |0-6
 |7
-|UTF-8 encoded: '''"BIPXXXX"''' (0x424950XXXXXXXX)
+|UTF-8 encoded: '''"BIPXXXX"''' (0x424950XXXXXXXX) (updated upon assignment of a BIP number)
 |-
 |7-38
 |32
-|'''REVOKE_PUZZLE''' (from the second output script)
+|'''REVOKE_PUZZLE'''
 |}
 
+=== Template Notes ===
+
+==== Payload ====
+The payload consists of two parts.
+# (constant 64-bytes) Secp256k1 '''compact signature'''
+# (optional 0 to 40-bytes) Application Use Payload
+
+==== Signature ====
+The signature provides two important roles:
+# Defining the '''Public Key''' (via [https://github.com/bitcoin-core/secp256k1/blob/master/include/secp256k1_recovery.h public key recovery]).
+# Proof that the owner of the public key accepts the associated revocation puzzle.
+
 ==== Burn Value ====
-The output value of the first script is the '''value burned'''. It optionally MAY be of zero-value.
+* The output value of the first script is the '''value burned'''.
 
-==== Revocation Puzzle ====
-The second output script encodes the '''revocation puzzle'''. The pre-image of the revocation puzzle is the '''revocation code'''.
+==== Revoke Puzzle ====
+* The pre-image of the revocation puzzle is the '''revocation code'''.
 
-=== Verification of an Enrolment Transaction ===
-* It is valid that a single public key MAY have more than one concurrent enrolment.
-* Applications SHOULD bind to an individual enrolment transaction. Applications SHOULD NOT bind to the public key.
-* Applications MUST verify that the signature correctly signs the revocation puzzle.
-* Application SHOULD wait for at least 6 of blocks before accepting an enrolment.
+=== Application Verification ===
+* A public key MAY have many concurrent enrolments.
+* A public key enrolment SHOULD be referenced by the enrolment transaction, not the public key itself.
+* User applications MUST verify the template rules.
+* Applications MUST NOT accept enrolment transactions with less than 6 confirmations.
+* Applications SHOULD display a warning when accepting enrolment transactions with 6 to 99 confirmations.
 
-=== Revocation Process ===
+=== Revocation ===
 * Upon reviving a valid revocation code applications MUST change the status of the associated enrolment transaction to '''revoked'''.
 * Applications SHOULD gossip revocation codes, so that the revoke status spreads quickly throughout the system.
 It is recommended that the revoke output is quickly spent for historical and accounting purposes.
@@ -134,11 +140,7 @@ It is recommended that the revoke output is quickly spent for historical and acc
 * The revocation code MUST be the OP_HASH256 hash of the private key compact form.
 
 === Compatibly ===
-This proposed transaction template will be considered non-standard.<ref>'''Why make currently non-standard transactions?'''
-
-The OP_HASH256 puzzle is the part of this transaction template that is currently non-standard. The authors believe that the utility provided by having revocations extremely cheap to verify is worth the effort of broadening the is_standard requirements.
-We also observe for the deployment of this BIP, that hash-based-puzzles seem to get confirmed with reasonable regularity, possibly indicating that miners already ignore some of the is_standard rules.
-</ref>
+This proposed transaction template will be considered non-standard.
 
 We recommend if this specification is adopted that the transaction template defined here is considered a standard transaction form.
 
@@ -150,4 +152,5 @@ We recommend if this specification is adopted that the transaction template defi
 
 == Appendices ==
 
-== Acknowledgements ==
+=== Revocation Code Design ===
+The revocation code has been chosen as the most-simple design to enable secure revocations.  Revocations are single-use so they should not require a cryptographic signature, making them cheaper and easier to verify. The use of OP_HASH256 allows us to have a full 128-bit of entropy that is useful.
