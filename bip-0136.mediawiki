@@ -1,7 +1,7 @@
 <pre>
-  BIP: XXXX
+  BIP: 0136
   Layer: Applications
-  Title: Bech32 Encoded Transaction Postion References
+  Title: Bech32 Encoded Transaction Position References
   Author: Велеслав <veleslav.bips@protonmail.com>, Jonas Schnelli <dev@jonasschnelli.ch>
   Comments-Summary: No comments yet.
   Comments-URI: https://github.com/bitcoin/bips/wiki/Comments:BIP-XXXX
@@ -25,7 +25,7 @@ This BIP is licensed under the 2-clause BSD license.
 
 === Motivation ===
 
-Bitcoin uses regularly use TxID (Transaction Identifiers) for referencing individual transactions. TxID's are a core part of the consensus protocol and were naturally exported to the user-space since the first release of Bitcoin.
+Bitcoin users regularly use TxID (Transaction Identifiers) for referencing individual transactions. TxID's are a core part of the consensus protocol and were naturally exported to the user-space since the first release of Bitcoin.
 
 However, for many use-cases they have practical limitations:
 * TxID's are expensive for full nodes to lookup.
@@ -36,8 +36,8 @@ For transactions that have been embedded in the blockchain, it is possible to re
 
 === Examples ===
 All examples use the ''Bitcoin Display Format 0'' described in ''Bitcoin Display Formats'' appendix.
-* Genesis Coinbase Transaction: <tt>tx1-rqqq-qqqq-qmhu-qk</tt>
-* Transaction #2205 of Block #466793: <tt>tx1-rjk0-u5ng-4jsf-mc</tt>
+* Genesis Coinbase Transaction: <tt>tx1:rqqq-qqqq-qmhu-qk</tt>
+* Transaction #2205 of Block #466793: <tt>tx1:rjk0-u5ng-4jsf-mc</tt>
 
 == Specification ==
 
@@ -61,7 +61,7 @@ If a display format doesn't comply with this standard, it MUST be called a '''no
 ==== Encoding ====
 * All display formats MUST be encoded with standard Bech32<ref>'''Why use Bech32 Encoding for Confirmed Transaction References?''' The error detection and correction properties of this encoding format make it very attractive. We expect that it will be reasonable for software to correct a maximum of two characters; however, we haven’t specified this yet.</ref> encoding as defined within the [https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki BIP 0173] specification.
 * The Human Readable Part of the Bech32 encoding MUST be "tx"<ref>'''Why use the same Human Readable Part for different systems or blockchains?''' The ‘tx1’ prefix is to namespace the Bech32 encoding to this specification. We use Magic Values internally to namespace between projects.</ref>.
-* All Non Bech32 alphabet characters after the Bech32 code separator MUST be ignored when phasing, (except for terminating characters).<ref>'''Why Strip all Non-Bech32 Alphabet Characters?''' We do not wish to expect the users to keep their TxRef's in good unicode form. We expect them to copy, paste, write by-hand, write in a mix of character sets, etc.  Phasers should automaticity correct for all of these sorts of errors. However, we only specify the removal of non-bech32-alphabet characters.
+* All Non Bech32 alphabet characters after the Bech32 code separator MUST be ignored when parsing (except for terminating characters).<ref>'''Why Strip all Non-Bech32 Alphabet Characters?''' We do not wish to expect the users to keep their TxRef's in good unicode form. We expect them to copy, paste, write by-hand, write in a mix of character sets, etc.  Parsers should automatically correct for all of these sorts of errors. However, we only specify the removal of non-bech32-alphabet characters.
 </ref>
 
 ==== Namespacing ====
@@ -74,7 +74,7 @@ If a display format doesn't comply with this standard, it MUST be called a '''no
 * Magic codes are either 5, 10, 15, or 20-bits long.
 
 * The length of the magic code is set by the first 5 bits:
-** 0x0 to 0x7: 5-bit long. (All Reserved<ref>'''Why reserve all single character Magic Codes?''' The authors of this specification see many potential Bitcoin Related uses for additional magic codes, such as with Sidechains and other Special User Facing Projects.</ref> for Bitcoin-Related Use)
+** 0x0 to 0x7: 5-bit long. (All Reserved<ref>'''Why reserve all single character Magic Codes?''' The authors of this specification see many potential Bitcoin Related uses for additional magic codes, such as with Sidechains and other special user facing projects.</ref> for Bitcoin-Related Use, we have the special exception for Litecoin, that is also assigned a 5-bit code.)
 ** 0x8 to 0x15: 10-bit long.
 ** 0x16 to 0x23: 15-bit long.
 ** 0x24 to 0x31: 20-bit long.
@@ -140,10 +140,10 @@ Magic Values 5-bit long:
 |'''‘r’'''
 |'''Bitcoin Main Chain'''
 |-
-|
-|0x4
-|‘y’
-|Reserved
+|'''Litecoin'''
+|'''0x4'''
+|'''‘y’'''
+|'''Litecoin Main Chain'''
 |-
 |
 |0x5
@@ -166,12 +166,17 @@ Magic Values 15-bit long: (none allocated).
 
 Magic Values 20-bit long: (none allocated);
 
+=== Standard Display Formats ===
+
+For non-bitcoin related display formats please reference the external SLIP-XXXX "TxRef Non-Bitcoin Display Formats".
+
 === Bitcoin Display Formats ===
 This appendix contains the specifications for Bitcoin Related Application Display Formats.
 * If you wish to contribute a new display-format, please open a pull request adding to this appendix.
-** For Example. A display format for a Bitcoin Sidechain.
-* We have deliberately not included a Bitcoin display format for the years past 2048.
-** We think it is prudent to design the new display format closer to this date.
+* We have considered various encoding schemes, however we were unable to find a variable-length encoding that sufficiently minimised overhead.
+** If there is a hard-fork which expands the number of transactions per block beyond the current 8191 limit, we will simply define a new `Bitcoin Display Format 1`.  Considering the disruption a Hard Fork causes; the creation of a secondary Display Format should not be of significant concern.
+** In the case there is a Drive-Chain style extension or other indirect extension to Bitcoin's transactional capacity; it makes no sense to try and define for an undefined format now. We will simply use a new Magic Value and create a tailored Display Format for the new system.
+** In the case that it is nearing Year 2048, we think that we will be in a far-better position to define a new format that suits the needs of the Bitcoin users than now.
 
 ==== Bitcoin Display Format 0 ====
 This application display format is defined for all Bitcoin main-network transactions that have:
@@ -181,7 +186,7 @@ This application display format is defined for all Bitcoin main-network transact
 ** Between 0, and 0x1FFF.
 
 This application display format produces a 14-character data part starting with the character ‘r’.
-* Separators MUST be added as shown: tx1-rXXX-XXXX-XXXX-XX.
+* Separators MUST be added as shown: tx1:rXXX-XXXX-XXXX-XX.
 {| class="wikitable"
 |'''Format ‘0’'''
 |'''Bit'''
@@ -209,25 +214,25 @@ This application display format produces a 14-character data part starting with 
 |8191 transactions. (A full Bitcoin Block without Hard  Fork).
 |}
 
-===== Test Vectors (for Display Format 0) =====
+===== Test Vectors (for Bitcoin Display Format 0) =====
 The following list gives properly encoded Display Format 0 TxRef's and the values in hex. (Block Height, Tx Position)
-* <tt>tx1-rqqq-qqqq-qmhu-qk</tt>: <tt>(0x0, 0x0)</tt>
-* <tt>tx1-rqqq-qull-6v87-r7</tt>: <tt>(0x0, 0x1FFF)</tt>
-* <tt>tx1-r7ll-lrqq-vq5e-gg</tt>: <tt>(0x1FFFFF, 0x0)</tt>
-* <tt>tx1-r7ll-llll-khym-tq</tt>: <tt>(0x1FFFFF, 0x1FFF)</tt>
+* <tt>tx1:rqqq-qqqq-qmhu-qk</tt>: <tt>(0x0, 0x0)</tt>
+* <tt>tx1:rqqq-qull-6v87-r7</tt>: <tt>(0x0, 0x1FFF)</tt>
+* <tt>tx1:r7ll-lrqq-vq5e-gg</tt>: <tt>(0x1FFFFF, 0x0)</tt>
+* <tt>tx1:r7ll-llll-khym-tq</tt>: <tt>(0x1FFFFF, 0x1FFF)</tt>
 
 The following list give valid Display Format 0 TxRef's and the values in hex. (Block Height, Tx Position)
-* <tt>tx1-rjk0-u5ng-4jsf-mc</tt>: <tt>(0x71F69, 0x89D)</tt>
+* <tt>tx1:rjk0-u5ng-4jsf-mc</tt>: <tt>(0x71F69, 0x89D)</tt>
 * <tt>TX1RJK0U5NG4JSFMC</tt>:  <tt>(0x71F69, 0x89D)</tt>
 * <tt>TX1R1JK0--U5bNG4JSb----FMC</tt>:  <tt>(0x71F69, 0x89D)</tt>
 * <tt>tx1 rjk0 u5ng 4jsfmc</tt>: <tt>(0x71F69, 0x89D)</tt>
 * <tt>tx1!rjk0\u5ng*4jsf^^mc</tt>: <tt>(0x71F69, 0x89D)</tt>
 
 The following list gives invalid Display Format 0 TxRef's and the reason for their invalidity.
-* <tt>tx1-t7ll-llll-gey7-ez</tt>: Magic 0xB instead of 0x3.  <tt>(0x1FFFFF, 0x1FFF)</tt>
-* <tt>tx1-rlll-llll-cgqu-n2</tt>: Version 1 instead of 0. <tt>(0x1FFFFF, 0x1FFF)</tt>
-* <tt>tx1-rjk0-u5ng-gghq-fkg7</tt>: Valid Bech32, but 10x5bit packages instead of 8.
-* <tt>tx1-rjk0-u5qd-s43z</tt>: Valid Bech32, but 6x5bit packages instead of 8.
+* <tt>tx1:t7ll-llll-gey7-ez</tt>: Magic 0xB instead of 0x3.  <tt>(0x1FFFFF, 0x1FFF)</tt>
+* <tt>tx1:rlll-llll-cgqu-n2</tt>: Version 1 instead of 0. <tt>(0x1FFFFF, 0x1FFF)</tt>
+* <tt>tx1:rjk0-u5ng-gghq-fkg7</tt>: Valid Bech32, but 10x5bit packages instead of 8.
+* <tt>tx1:rjk0-u5qd-s43z</tt>: Valid Bech32, but 6x5bit packages instead of 8.
 
 === Special Display Formats ===
 This appendix contains the specifications for Special Display formats that should not be used in production use.
@@ -241,7 +246,7 @@ This ''non-standard'' application display format is defined for all test-network
 This ''non-standard'' application display format uses the non-standard "testtx" as the human readable part of the Bech32 encoding.
 
 This application display format produces a 16-character data part starting with the character ‘x’.
-* Separators MUST be added as shown: testtx1-xXXX-XXXX-XXXX-XXXX.
+* Separators MUST be added as shown: testtx1:xXXX-XXXX-XXXX-XXXX.
 {| class="wikitable"
 |'''Format ‘A’'''
 |'''Bit'''
@@ -264,7 +269,7 @@ This application display format produces a 16-character data part starting with 
 | 
 |-
 |Tx Position
-|32 – 44
+|32 – 49
 |18
 | 
 |}
