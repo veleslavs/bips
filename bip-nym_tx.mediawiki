@@ -1,0 +1,380 @@
+<pre>
+  BIP: NYM_TX
+  Layer: Applications
+  Title: Nym Enrolment Transaction Template
+  Author: Велеслав <veleslav.bips@protonmail.com>
+          M <m@opennym.org>
+          P <p@opennym.org>
+  Comments-Summary: No comments yet.
+  Comments-URI: https://github.com/bitcoin/bips/wiki/Comments:BIP-NYM_TX
+  Status: Draft
+  Type: Standards Track
+  Created: 2018-10-03
+  License: BSD-3-Clause
+           CC0-1.0
+</pre>
+
+== Abstract ==
+This BIP proposes a new transaction version 3, that is accompanied with a template called “Nym” to be used by applications as a low-level decentralised authentication primitive built on top of Bitcoin.
+
+This proposal wishes to add this specification to the set of gossiped templates (“IsStandard”), if adopted.
+
+== Copyright ==
+This document is dual licensed as BSD 3-clause and Creative Commons CC0 1.0 Universal.
+
+== Specification ==
+
+=== Prerequirements ===
+A nym prerequires
+* a SECP256K1 keypair (<code>nym_private_key</code>-<code>nym_public_key</code>) and
+* a 32B revocation solution (<code>nym_revocation_solution</code>).
+
+Also prerequired are
+* a determined burn amount,
+* determined if a custom usage byte is desired and if so which, and
+* funds for transaction fee and any burn.
+
+=== Transaction ===
+Transactions MUST opt-in to this template by using transaction version 3.
+
+The nym enrolment transaction has a single input: <code>funding</code>, and two or three outputs: <code>burn</code>, <code>revoke</code> and optionally <code>change</code>.
+
+The transaction MUST fit the following template:
+<pre>
+version:     0x3
+marker:      0x0
+flag:        0x1
+txin_count:  0x1
+txout_count: 0x2 (without change) or 0x3 (with change)
+lock_time:   (any)
+</pre>
+
+==== Funding (Input) ====
+
+The input MUST be a standard P2WPKH input:
+<pre>
+signature_script: (empty)
+witness_script:   <signature> <public_key>
+</pre>
+
+==== Proof of Burn (Output 1) ====
+
+This is the data carrier output. Users may place value here to signal a “proof of burn” (PoB).
+
+The first output MUST fit the following template:
+
+<pre>
+value:             (any)
+public_key_script: RETURN <1-byte-nym_version || 1-byte-nym_use ||
+                   64-byte-nym_signature || 32-byte-nym_public_key>
+</pre>
+
+The public key fields are:
+
+<pre>
+nym_version:    0x0 (initial version)
+nym_use:        0x0 (default)
+nym_signature:  64-bytes, SECP256K1 compact signature.
+nym_public_key: 32-bytes, SECP256K1 compact public key.
+</pre>
+
+==== Revocation (Output 2) ====
+
+This is the revocation output: that its revocation output has been spent means a nym has been revoked.
+
+The second output MUST fit the following template (please note this output MUST have a value of zero):
+
+<pre>
+value:             0
+public_key_script: SIZE 32 EQUALVERIFY HASH256 <32-byte-nym_revocation_puzzle> EQUAL
+</pre>
+
+The public key script pushdata field is the 32B puzzle value for revocation, defined as:
+
+<pre>
+nym_revocation_puzzle: SHA256(SHA256(nym_revocation_solution))
+</pre>
+
+Revocation solution (32B, implementation-defined):
+
+<pre>
+nym_revocation_solution: secret bytes.
+</pre>
+
+==== Change (Output 3, optional) ====
+
+This output MAY have any value, however we RECOMMEND the value should be at least the dust limit. Standard implementations SHOULD enforce their usual dust limit with this output.
+
+The third output MUST be a standard P2WPKH or P2WSH output:
+
+<pre>
+value:             (any)
+public_key_script: 0 <20-or-32-byte-hash>
+</pre>
+
+=== Nym Signature ===
+
+The <code>nym_signature</code> is made using
+
+* The SECP256K1 algorithm and its compact signature format,
+* The 34-byte <code>nym_signature_text</code> to <code>nym_signature_hash</code> translation function is SHA256 HMAC, and
+* The HMAC salt is UTF-8-encoded and consists of
+** Domain-separation to Nym, with a separator: <code>NYM/</code> (first part),
+** Domain-separation to Bitcoin, with a separator: <code>BTC/</code> (second part), and
+** Domain-separation to Bitcoin’s Mainnet or Testnet: <code>MAINNET</code> or <code>TESTNET</code> (third part).
+I.e. for nym enrolment transactions on the Bitcoin main network, the HMAC salt used is <code>NYM/BTC/MAINNET</code>.
+
+Nym signature text (34B) composition:
+
+<pre>
+nym_signature_text: 1-byte-nym_version || 1-byte-nym_use || 32-byte-nym_revocation_puzzle
+</pre>
+
+Nym signature hash (32B) definition:
+
+<pre>
+nym_signature_hash: SHA256_HMAC(nym_signature_text,"NYM/BTC/MAINNET")
+</pre>
+
+Nym signature (64B) definition:
+
+<pre>
+nym_signature: SECP256K1_COMPACT(nym_signature_hash,nym_private_key)
+</pre>
+
+== Deployment ==
+
+Nodes may signal adoption of this Nym template into their IsStandard policy (probably using a service bit), preferentially connect to other adopter nodes, and accept and transmit transaction gossips that comply with this BIP only when connected to a node that signals support of this service.
+
+== Motivation ==
+
+=== Cryptographic Pseudonym ===
+
+One of the most sought after services within the cryptography community has been cryptographic pseudonyms, often shortened to “crypto-nym”, or just “nym”. Normally we understand a nym to consist of at least a cryptographic public key that is revokable.
+
+At present, PGP (Pretty Good Privacy) has been the first well-functioning attempt, and remains the de-facto standard for nyms. Even if considered old, it is secure within the scope of its design, and is well-featured and well-suited for email communications. It however remains ill-suited for P2P networks.
+
+=== Proof of Work ===
+
+The authors of this BIP have not observed any useful internet service that can reliably work without some form of “proof of work” (PoW). Our hypothesis is that this is a direct result of resource exhaustion attacks (commonly DDOS).
+
+The first P2P networks worked under the principle of “Uppermost Good Faith”. They were unauthenticated and trustful: they worked when they were not under attack, and when under attack they suffered horrible service degradation.<ref>Example: https://en.wikipedia.org/wiki/Email_spam</ref>
+
+Later generations of P2P networks quickly gained various methodologies for improving the resilience of the network, most famously shown by BitTorrent’s “tit for tat” accounting for bandwidth. This can be seen as a primitive form of proof of work, where the users are asked to provide a service (work, in this case bandwidth) to continue to use the service.<ref>Academic review: https://www.distributed-systems.net/my-data/papers/2007b.saso.pdf</ref>
+
+Other systems have taken more centralised approaches to protect against attack: usually some centralised authority is made that users must authenticate with to gain access to services of the network. Maintaining an “in good standing” registration is where users must perform some proof of work, such as using a new IP address, making a payment, receiving an SMS, solving “click on the right image” puzzles, being a real-life member of a group, and so on.<ref>Example: https://www.gmail.com</ref>
+
+In an attempt to decentralise centralised authority, some P2P networks have attempted to use a decentralised Web of Trust (WoT). This works by creating a network of nodes that can give trust ratings to each other. The core problem these networks were faced with was that somebody could make a very large trust network without significant cost, meaning that new users would not be able to determine a genuine network from an attacking one without having an out of band trust anchor. Additionally, a network is unable to provide any costly services to new nodes if the cost of creating a new node is insignificant.<ref>Examples: https://bitcoin-otc.com/trust.php and https://github.com/freenet/wiki/wiki/Web-of-Trust</ref>
+
+Well-defined proof of work can be used to solve the “default trust problem”. If a new node can show that it performed “work” to come into existence then the other participants can ascribe a value of “trust” without knowing anything else about the node. We call that value the “default trust”.
+
+Bitcoin took the concept of proof of work to the logical extreme: all resources in the Bitcoin P2P network are trustlessly allocated through the extremely competitive process of mining, which produces a tradable unit of account that thereon is used as a way to auction access to the Bitcoin P2P network core service, which is confirmation of transactions in a gossip network.
+
+=== This BIP ===
+
+Making use of the natural proof of work properties that Bitcoin provides, this BIP proposes a general-purpose Nym primitive, with
+* ''enrolment'' defined as inclusion into the blockchain of a Nym-templated transaction, and
+* ''revocation'' defined as disclosure of the nym’s revocation solution, done primarily by spending of the nym transaction’s revocation output.
+
+The Nym primitive has proof of work built-in in two aspects:
+* Enrolment aspect: The space a nym takes in a block comes at a well-defined opportunity cost for the miner, meaning that even an enrolled nym without any burn can have been said to have performed some “work”.
+* Burn aspect: Bitcoin that is placed in the nym’s data carrier output cannot be spent elsewhere, creating a well-defined opportunity cost for the enrolee.
+
+The Nym primitive’s properties makes it well-suited as a foundational building block in many truly P2P systems.
+
+== Rationale ==
+
+=== Why use this proposal instead of PGP? ===
+
+This proposal is not intended to replace PGP, which is a complete user-facing message encryption solution. Nym provides a minimalistic low level authentication primitive that has built-in proof of work, well suited for use in P2P networks.
+
+=== Why call the process of getting a nym transaction confirmed “enrolment”? ===
+
+We call the process of gaining confirmations within the blockchain “enrolment” as it is a decentralised process that has no central authority to “register” with.
+
+=== Why require the enrolment transaction to use a new transaction version? ===
+
+This proposal wishes to maintain a clear domain separation from the established uses of Bitcoin. Bitcoin provides the transaction version primitive for this purpose. Transactions opt-in to Nym by using transaction version 3.
+
+This domain separation allows significant flexibility with upgrades and expansion of Nym without affecting any prior-existing transaction conventions.
+
+=== Use of a hash puzzle for the revocation ===
+
+A normal Bitcoin signature covers the particulars of the transaction that contains it e.g. what amounts to whom, as the scope of the signature is for the owner to authorise spending conditionally for that particular given transaction only.
+
+A revocation is based on the sharing only of the revocation solution. Hence Bitcoin signatures do not represent revocation logics, this instead is done by Bitcoin’s hash preimage verification primitives.
+
+A hash preimage output can be spent for any purpose by anyone who holds the preimage. In Nym’s case, the hash preimage output is the revocation output, and the hash preimage is the secret revocation solution. While normally revocation is performed by a nym’s owner, we envision that charitable participants who are aware of puzzle-solutions may periodically publish group transactions that “collect” any unspent revocation outputs.
+
+=== Why must the revocation output be of zero value? ===
+
+We find it important to not create differing classes of revocation outputs. This makes particular sense as future TXFEE rates not can be pre-locked or predicted. Therefore the most prudent value choice convention is zero always.
+
+=== Why not use a P2SH or P2WSH for the revocation? ===
+
+It is possible to construct a script within P2SH or P2WSH, however we find these options of lesser elegance or quality than the above. For a possible P2WSH-based construction please see appendix 1.
+
+=== Why does a nym need a signature at all? ===
+
+If a nym not would include a signature, various attacks would be possible. The nym signature includes the key itself and signs over the vital fields, which are the nym’s version, usage byte and revocation puzzle.
+
+For example, Malory could see Alice trying to enrol a key with a large burn amount. Without having a signature, Malory could copy Alice’s public key, and enrol another nym with Alice’s public key but Malory’s revocation key. If Malory puts a large fee on this imposting enrolment or cooperates with a miner, he could get the imposting enrolment included in a block before Alice gets hers enrolled, opening for ambiguity, frustration or worse.
+
+=== Why not use public key retrieval making every enrolment transaction smaller? ===
+
+We initially wished to use EC public key retrieval, which would have made enrolment transactions 31 bytes smaller. However after careful discussion, we have been consulted that this ordinary and mathematical process is claimed to be patented, and out of an abundance of caution should be avoided.
+
+=== Why call it “nym” if there is no name directly associated with it? ===
+
+In the same way a PGP key when used as an identifier is a nym, this proposal can accurately be called a nym.
+
+=== Isn’t block space precious and should not be wasted on “non-economic purposes”? ===
+
+“Nym” embodies an economic purpose, and the Bitcoin blockchain readily caters to it.
+
+Fundamentally we believe that an economic purpose is shown by the fact that a user wishes to expend resources (do work) to out-compete the next best economic use of the blockchain.
+
+=== How are you going to fit nyms for every person and their pets and household smart appliances into the blockchain? ===
+
+We won’t. More seriously, nyms will be made by those who have the economic purpose to make one. Not every purpose requires Bitcoin’s level of security. Other blockchains can offer comparable systems with a potentially lower enrolment cost or greater bandwidth.
+
+== Backwards Compatibility ==
+
+As this is an application layer structure without any preexisting deployment, we foresee no compatibility issues.
+
+== Reference Implementation ==
+
+To be made.
+
+== Acknowledgements ==
+
+While we have somewhat independently come up with the concept of Nym, the idea of having a public record of public key enrolments has been around for a long time. It would be very appreciated if the wider community could provide some important references for this section.
+
+We would kindly like to thank Jonas Schnelli for his long term support and reviews.
+
+== Appendixes ==
+
+=== Appendix 1: Alternative “IsStandard” Construction ===
+
+In the process of private review, some reviewers have voiced concerns that the Bitcoin network would censor nym enrolments due to not being compliant with the established gossiping policy (“IsStandard”). Said reviewers preceded to recommend various nym enrolment constructions that are compliant under the current policy.
+
+The authors of this BIP do not share this pessimistic view on the Bitcoin network, and see the role of any such policy as regarding network DDOS protection only and believe that censoring valid transactions is contrary to Bitcoin’s ethos.
+
+Either way, ''if'' forced to use a construction that’s compliant with the current Bitcoin Core IsStandard policy, we provide here one possible construction:
+
+<ins>(Please note that this construction not should be used, and is included as an appendix for completeness and academic purposes only.)</ins>
+
+
+'''Transaction Specification:'''
+
+This construction works with the same functionality as above, and we only show the design differences here. Notably,
+
+* we have modified the transaction version to 2,
+* the revocation output now can have a non-zero value, and
+* the change output is now '''compulsory''' and contains both <code>public_key</code> and <code>puzzle</code>:
+
+<pre>
+version:     0x2
+txout_count: 0x3
+</pre>
+
+The funding input and nym signature formats are unchanged.
+
+==== Proof of Burn (Output 1) ====
+
+In order for it to fit IsStandard’s 80 bytes data limit, the nym public key part has been moved to output 3 (where it is included in an encoded form). Leaving the version byte (1B), usage byte (1B) and nym signature (64B) unchanged:
+
+<pre>
+public_key_script: RETURN <1-byte-nym_version || 1-byte-nym_use ||
+                   64-byte-nym_signature>
+</pre>
+
+==== Revocation (Output 2) ====
+
+We have made two modifications to the revocation output:
+
+* The output can have any value, in contrast with above where it is required to be of zero value. This is to satisfy IsStandard’s requirement that the value of any output which is not of null data type must be above a certain threshold called the “dust threshold”.
+
+* The hash puzzle is now a P2WSH output, in contrast with above where it’s a non-IsStandard hash puzzle output. This is to satisfy IsStandard’s script template requirements.
+
+Due to the change of form of representation of the hash puzzle, the revocation puzzle has been removed from this output. Instead it is now encoded in output 3, and is needed to verify that the witness script hash in this output is correct.
+
+<pre>
+value:             (any)
+public_key_script: 0 <32-byte-witness_script_hash>
+</pre>
+
+The witness MUST conform to the following template, script 39B and script hash 32B:
+
+<pre>
+witness_script:      SIZE 32 EQUALVERIFY HASH256 <32-byte-nym_revocation_puzzle> EQUAL
+witness_script_hash: SHA256(witness_script)
+</pre>
+
+==== Change (Output 3, compulsory) ====
+
+We have modified this output to be an 1 out of 3 bare multi signature output, where the first public key slot represents the actual change. Only this key can spend the transaction, and the second and third public key slots are used to store data:
+
+They contain the 32-byte nym_public_key and 32-byte nym_revocation_puzzle, xor-encoded with the witness script hash in output 2, and prefixed with <code>0x04</code> to represent them as being standard compressed public keys. This encoding ensures that they cannot be interpreted as valid public keys and hence cannot be spent. (This may not hold true in an invalid nym enrolment.)
+
+<pre>
+value:                     (any)
+public_key_script:         3
+                           <33-byte-change_public_key>
+                           <33-byte-encoded_nym_public_key>
+                           <33-byte-encoded_revocation_puzzle>
+                           1 CHECKMULTISIG
+encoded_nym_public_key:    0x04 || XOR(nym_public_key       ,witness_script_hash)
+encoded_revocation_puzzle: 0x04 || XOR(nym_revocation_puzzle,witness_script_hash)
+</pre>
+
+=== Appendix 2: Nym Lifecycle Overview ===
+
+A nym’s lifecycle undergoes the ''composing'', ''enrolment'' and ''revocation'' phases, featuring the states (private:) ''unpublished'', (public, in the sense publicly observable:) ''pending'', ''active'' and ''revoked'':
+
+==== Unpublished ====
+
+The process of composing the nym enrolment transaction:
+
+# Constructing the sign text,
+# Signing and constructing the data carrier burn output,
+# Constructing the revocation output,
+# Funding the transaction, and
+# Taking the transaction through any self-validation.
+
+''Unpublished transitions to pending when the transaction is published to the Bitcoin network.''
+
+==== Pending ====
+
+Pending is the process of the enrolment of a nym, where the nym transaction is confirmed and then reaches maturity. The pending state can stall, if the Bitcoin network would not confirm the transaction.
+
+The maturation period is user defined and will depend on purpose, however at least 6 blocks is recommended.
+
+''Pending transitions to active when the transaction reaches maturity.''
+
+==== Active ====
+
+The nym is usable, until abandoned or revoked.
+
+''Active transitions to revoked when the nym is revoked off-chain or on-chain.''
+
+==== Revoked ====
+
+The nym is deemed not usable.
+
+=== Appendix 3: Notes on Enrolment and Decentralised Networks ===
+
+# In contrast with previous non-blockchain systems such as PGP, this protocol is specifically designed to be immune to denial of service attacks and to otherwise operate reliably also under stress:
+#* In their absence of Bitcoin’s integrated proof of work, key servers have always been either walled gardens or open to flooding attacks.
+#* In their absence of Bitcoin’s trustless operation, key servers have been subject to the typical problems of arbitrary breakdown of access or data.
+# It is very hard to attach a deterministic proof of burn without a blockchain. This BIP provides a natural way of fixing “work” to a nym at enrolment. Certificate authorities examplify a form of non-blockchain based proof of work, and their operational model is centralised and trusted.
+# As work is required to obtain a nym, a nym can be considered to have a non-zero default trust. Participants can choose to trust a previously unknown nym. The more difficult/expensive a nym is to create, the more it can be “trusted” up-front.
+# Decentralised networks have always had great difficulties bootstrapping new participants. Without proof of work, users who abuse the network have had zero cost in bootstrapping a new identity after being banned, opening the network to flood attacks.
+# Decentralised web of trust has been attempted to mitigate such flood attacks, however these have fallen short to sybil attacks meaning brittle decentralisation properties. This has been responded to only with single trust identity as de-facto “root trust”.
+# Autonomous calculation of “default trust” values for nyms allow decentralised networks to natively guard themselves from attacks, by exhausting the attacker’s (e.g. financial) resources, without need of any human intervention.
+
+All this cannot easily be achieved without leveraging the functionally of a blockchain such as Bitcoin’s.
+
+== Footnotes ==
+
+<references />
